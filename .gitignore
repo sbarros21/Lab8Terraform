@@ -1,0 +1,14 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+plan.tfplan
+
+# Backend real (solo el example va al repo)
+infra/backend.hcl
+
+# SSH keys
+*.pem
+*.key
