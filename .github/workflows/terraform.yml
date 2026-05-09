@@ -1,0 +1,94 @@
+name: Terraform CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_USE_OIDC: true
+
+jobs:
+  terraform-plan:
+    name: Terraform Format, Validate & Plan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: terraform init -backend-config="resource_group_name=rg-tfstate-lab8" -backend-config="storage_account_name=sttfstate2794" -backend-config="container_name=tfstate" -backend-config="key=lab8.terraform.tfstate"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -var-file=env/dev.tfvars
+        env:
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_allow_ssh_from_cidr: ${{ secrets.ALLOW_SSH_FROM_CIDR }}
+
+  terraform-apply:
+    name: Terraform Apply (Manual)
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    defaults:
+      run:
+        working-directory: infra
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: terraform init -backend-config="resource_group_name=rg-tfstate-lab8" -backend-config="storage_account_name=sttfstate2794" -backend-config="container_name=tfstate" -backend-config="key=lab8.terraform.tfstate"
+
+      - name: Terraform Apply
+        run: terraform apply -var-file=env/dev.tfvars -auto-approve
+        env:
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_allow_ssh_from_cidr: ${{ secrets.ALLOW_SSH_FROM_CIDR }}
