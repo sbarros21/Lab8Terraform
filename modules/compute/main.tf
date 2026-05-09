@@ -24,7 +24,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   name                = "${var.prefix}-vm-${count.index}"
   location            = var.location
   resource_group_name = var.resource_group_name
-  size = "Standard_B2s_v2"
+  size                = "Standard_B2s_v2"
   admin_username      = var.admin_username
   tags                = var.tags
 
